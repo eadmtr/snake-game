@@ -4,35 +4,42 @@
    [re-com.core :as re-com :refer [at]]
    [re-pressed.core :as rp]))
 
-
 ;;
 ;;
 ;;
 ;; Development.
 ;; Tasks:
 ;;   Game stage:
-;;   [  ] Check lose for end game
-;;   [  ] Score calculation
+;;   [   ] Check lose for end game
+;;   [   ] Score calculation
 ;;
 ;;   Rock massive:
-;;   [  ] Join stone to rock massive
-;;   [  ] Flush lines with whole points
+;;   [   ] Join stone to rock massive
+;;   [ X ] Flush lines with whole points
 ;;
 ;;   Stone:
-;;   [  ] Define set of stones
-;;   [  ] CRUD operation with stones queue
-;;   [  ] Rotate stone
-;;   [  ] Inject stone to the field line by line (from 1 bottom to whole stone)
-;;   [  ] Move stone left, right, down
-;;
+;;   [   ] Define set of stones
+;;   [ X ] CRUD operation with stones queue
+;;   [ X ] Rotate stone
+;;   [   ] Inject stone to the field line by line (from 1 bottom to whole stone)
+;;   [   ] Move stone left, right, down
 ;;
 ;;   Field:
-;;   [  ] Draw game field
-;;   [  ] Draw game field with stone
-;;   [  ] Draw game field with rock massive & stone
+;;   [ X ] Draw game field
+;;   [ X ] Draw game field with rock massive
+;;   [   ] Draw game field with stone
 ;;
 ;;
 ;;
+
+;; Rock rotattion
+(defn rotate [m]
+  (let [transpose (fn [v] (mapv (fn [ind] (mapv #(get % ind) (filter #(contains? % ind) v)))
+                                (->> (map count v) (apply max) range)))
+        transposed (transpose m)]
+    (vec (map
+          (fn [v] (-> v reverse vec))
+          transposed))))
 
 
 ;; Events
@@ -40,13 +47,43 @@
  :start-game
  (fn [cofx [act _]]        ;; 1st argument is coeffects, instead of db
    {:db       (update (:db cofx) act (fn [v] (inc v)))
-    :fx       [
-               [:dispatch [:add-empty-field]]
+    :fx       [[:dispatch [:add-empty-field]]
                [:dispatch [:add-rock]]
-               ]}))
+               [:dispatch [:add-stones]]]}))
 
 
+(rf/reg-event-db
+ :add-stones
+ (fn [db]
+   (let [
+         shape2 [[1 1] [1 0] [1 0]]
+         crd2 [1 1]
+         shape1 [[1] [1] [1] [1]]
+         crd1 [3 3]]
 
+     (assoc db :stones [{:crd crd2 :shape shape2} {:crd crd1 :shape shape1}]))))
+
+(rf/reg-event-db
+ :rotate-stone
+ (fn [db]
+   (update-in db
+              [:stones 0 :shape]
+              (fn [shape] (rotate shape)))))
+
+
+(rf/reg-event-db
+ :new-stone
+ (fn [db]
+   (let [rest (-> db :stones rest)
+         shape [[1 1] [1 1]]
+         crd [5 5]
+         ]
+     (assoc db
+            :stones
+            (conj (vec rest) {:crd crd :shape shape})))))
+
+
+;; Subs
 (rf/reg-sub
  :empty-field
  (fn [db]
@@ -59,7 +96,8 @@
 
 (rf/reg-sub
  :stone
- (fn [db] (:stone db)))
+ (fn [db]
+   (-> db :stones first)))
 
 (rf/reg-sub
  :game-field
@@ -70,22 +108,18 @@
 
  (fn [[empty-field rock _]]
    (let [rock-on-field (concat (drop (count rock) empty-field) rock)]
-     rock-on-field
-     )))
-
+     rock-on-field)))
 
 (rf/reg-event-db
  :clear-rock
  (fn [db]
    (let [rock (:rock db)
          cleared (filter #(not-every? #{1} %) rock)
-         flushed (filter #(every? #{1} %) rock)
-         ]
+         flushed (filter #(every? #{1} %) rock)]
 
-     (assoc db :rock cleared )
-     )))
+     (assoc db :rock cleared))))
+
 ;; Helpers
-
 (rf/reg-event-db
  :add-rock
  (fn [db [_ _]]
@@ -95,13 +129,10 @@
          l3 (assoc flush 9 0)
          l4 (assoc flush 12 0)
          l5 (assoc flush 9 0)
-         r [
-            flush l1 flush
-            l2 flush flush l3 flush l4 flush l5
-            ]
-         ]
-     (assoc db :rock r))
-   ))
+         r [flush l1 flush
+            l2 flush flush l3 flush l4 flush l5]]
+
+     (assoc db :rock r))))
 
 (rf/reg-event-db
  :add-empty-field
@@ -109,17 +140,8 @@
    (let [max-x (-> db :frame first)
          max-y (-> db :frame last)
          line (vec (take max-x (repeat 0)))
-         r (def r (vec (take max-y (repeat line))))
-         ]
-
-     ;;(def r1 (assoc r 14 (vec (take 15 (repeat "X")))))
-     ;;(assoc db :empty-field r1)
-
-     (assoc db :empty-field r)
-     )))
-
-
-
+         r (vec (take max-y (repeat line)))]
+     (assoc db :empty-field r))))
 
 ;; View
 (defn game-field []
@@ -138,12 +160,14 @@
     ;; [:li [:button {:on-click #(rf/dispatch [:add-empty-field])} "Add field"]]
     ;; [:li [:button {:on-click #(rf/dispatch [:add-rock])} "Add rock"]]
     ;; [:li [:button {:on-click #(rf/dispatch [:add-stone])} "Add stone"]]
-    [:li [:button {:on-click #(rf/dispatch [:clear-rock])} "Clear rock"]]
 
     "- Game"
     [:li [:button {:on-click #(rf/dispatch [:start-game])} "Start Game"]]
-    [:li "Field"[game-field]]]])
+    [:li [:button {:on-click #(rf/dispatch [:clear-rock])} "Clear rock"]]
+    [:li [:button {:on-click #(rf/dispatch [:rotate-stone])} "Rotate Stone"]]
+    [:li [:button {:on-click #(rf/dispatch [:new-stone])} "New stone"]]
 
+    [:li "Field" [game-field]]]])
 
-(defn init-state [ ]
-  (rf/dispatch-sync [:add-empty-field]))
+;; (defn init-state [ ]
+;;   (rf/dispatch-sync [:add-empty-field]))
