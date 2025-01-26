@@ -32,6 +32,45 @@
 ;;
 ;;
 
+(defn shapes []
+  [[[1 1 1 1]]
+   [[1 1][1 1]]
+   [[1 1][1 0][1 0]]
+   [[1 1][0 1][0 1]]
+   [[0 1 1][1 1 0]]
+   [[1 1 0][0 1 1]]
+   [[1 1 1][0 1 0]]])
+
+
+(defn inject-shape [field shape origin]
+  (let [source field
+        crd-x (first origin)
+        crd-y (last origin)]
+
+  (loop [usm shape ; upd-shape-map
+         src source
+         y (dec crd-y)
+         x (dec crd-x)]
+
+    (if (empty? usm)
+      src
+      (recur (rest usm)
+             (update src
+                     y
+                     (fn [v]
+                       (let [f (first usm)
+                             pre (take x v)
+                             post (drop (+ (count pre) (count f)) v)]
+                         (vec (flatten [pre f post])))
+
+                       ))
+
+             (inc y)
+             x)))
+      ))
+
+
+
 ;; Rock rotattion
 (defn rotate [m]
   (let [transpose (fn [v] (mapv (fn [ind] (mapv #(get % ind) (filter #(contains? % ind) v)))
@@ -106,9 +145,20 @@
     (rf/subscribe [:rock])
     (rf/subscribe [:stone])])
 
- (fn [[empty-field rock _]]
-   (let [rock-on-field (concat (drop (count rock) empty-field) rock)]
-     rock-on-field)))
+ (fn [[empty-field rock stone]]
+   (let [
+         stone-on-field (inject-shape empty-field (:shape stone) (:crd stone))
+         rock-on-field (concat (drop (count rock) empty-field) rock)
+         ]
+
+     (if true
+       rock-on-field
+       stone-on-field)
+
+     )
+
+
+   ))
 
 (rf/reg-event-db
  :clear-rock
