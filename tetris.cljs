@@ -42,6 +42,16 @@
    [[1 1 1][0 1 0]]])
 
 
+;; Rock rotattion
+(defn rotate [m]
+  (let [transpose (fn [v] (mapv (fn [ind] (mapv #(get % ind) (filter #(contains? % ind) v)))
+                                (->> (map count v) (apply max) range)))
+        transposed (transpose m)]
+    (vec (map
+          (fn [v] (-> v reverse vec))
+          transposed))))
+
+
 (defn get-coordinates [rock]
   (let [crd (:crd rock)
         x (first crd)
@@ -63,25 +73,37 @@
                  (next rows)))))))
 
 (defn can-move-shape-to-in-field [direction shape field]
-  (let [left (fn [crd] (assoc crd 0 (-> crd first dec)))
+  (let [shape (case direction
+                :rotate (update shape :shape (fn [s] (rotate s)))
+                shape)
+
+
+
+        left (fn [crd] (assoc crd 0 (-> crd first dec)))
         right (fn [crd] (assoc crd 0 (-> crd first inc)))
         down (fn [crd] (assoc crd 1 (-> crd last inc)))
+        up (fn [crd] crd)
+        crd-mover (case direction :left left :right right :down down :rotate up)
 
         coordinates (get-coordinates shape)
-        crd-getter (case direction :left left :right right :down down)]
+        moved-coordinates (mapv crd-mover coordinates)
+        ]
 
     (loop [can-move? true
-           crds coordinates]
+           crds moved-coordinates]
 
       (if (or (false? can-move?) (nil? crds))
         can-move?
-        (let [dest-crd (crd-getter (first crds))
+        (let [dest-crd (first crds)
               content-crd (get-in field [(-> dest-crd last dec)
                                          (-> dest-crd first dec)])
               can-move? (if (or (nil? content-crd) (= 1 content-crd)) false true)
               ]
           (print dest-crd content-crd)
           (recur can-move? (next crds)))))))
+
+
+
 
 (defn inject-shape [field shape origin]
   (let [source field
@@ -108,16 +130,6 @@
              x)))
       ))
 
-;; Rock rotattion
-(defn rotate [m]
-  (let [transpose (fn [v] (mapv (fn [ind] (mapv #(get % ind) (filter #(contains? % ind) v)))
-                                (->> (map count v) (apply max) range)))
-        transposed (transpose m)]
-    (vec (map
-          (fn [v] (-> v reverse vec))
-          transposed))))
-
-
 ;; Events
 (rf/reg-event-fx              ;; -fx registration, not -db registration
  :start-game
@@ -125,8 +137,10 @@
    {:db       (update (:db cofx) act (fn [v] (inc v)))
     :fx       [
                [:dispatch [:init-rock]]
-               [:dispatch [:add-rock-test]]
-               [:dispatch [:add-stones]]]}))
+               ;[:dispatch [:add-rock-test]]
+               [:dispatch [:add-stones]]
+               ]
+    }))
 
 
 (rf/reg-event-db
@@ -136,14 +150,14 @@
          shape3 [[1]]
          crd3 [2 2]
 
-         shape2 [[1 1] [1 0] [1 0]]
-         crd2 [5 1]
+         shape2 [[1 1] [1 1] [1 1]]
+         crd2 [13 1]
 
-         shape1 [[1] [1] [1] [1]]
-         crd1 [3 3]
+         shape1 [[1][1][1][1]]
+         crd1 [13 12]
          ]
 
-     (assoc db :stones [{:crd crd2 :shape shape2} {:crd crd1 :shape shape1}]))))
+     (assoc db :stones [{:crd crd1 :shape shape1} {:crd crd1 :shape shape1}]))))
 
 (rf/reg-event-db
  :rotate-stone
@@ -248,7 +262,8 @@
             ]
          ;r (assoc rock 14 flush)
          ;r (inject-shape rock r [1 10])
-         r (inject-shape rock [[1 1 0 0 0 1 1 1 1 1 1 1 1 1 1]] [1 2])
+         r (inject-shape rock [[0 0 1 1 1 1 1 1 1 1 1 1 1 1 1]] [3 2])
+         ;r rock
          ]
 
      (assoc db :rock r))))
@@ -287,7 +302,9 @@
     [:li [:button {:on-click #(rf/dispatch [:clear-rock])} "Clear rock"]]
 
     [:li [:button {:on-click #(rf/dispatch [:new-stone])} "New stone"]]
-    [:li [:button {:on-click #(rf/dispatch [:rotate-stone])} "^"]]
+    ;[:li [:button {:on-click #(rf/dispatch [:rotate-stone])} "^"]]
+
+    [:li [:button {:on-click #(rf/dispatch [:move-stone :rotate])} "^"]]
     [:li [:button {:on-click #(rf/dispatch [:move-stone :down])} "V"]]
     [:li [:button {:on-click #(rf/dispatch [:move-stone :left])} "<"]]
     [:li [:button {:on-click #(rf/dispatch [:move-stone :right])} ">"]]
