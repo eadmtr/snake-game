@@ -5,12 +5,11 @@
    [re-com.core :as re-com :refer [at]]
    [re-pressed.core :as rp]))
 
-
-
 ;;<
 ;; Plan
 ;;>
 ;; Development.
+;;
 ;; Tasks:
 ;;   Game stage:
 ;;   [   ] Check lose for end game
@@ -37,20 +36,50 @@
 ;;   [ X ] Draw game field with rock massive
 ;;   [ X ] Draw game field with stone
 ;;
-
-
+;; Refactor:
+;;   [   ] (def fix-move
+;;   [   ] (defn move-shape-to-in-field [direction shape field]
+;;   [   ] merge :rotate-stone & :move-stone
+;;
 
 ;;<
 ;; Func
 ;;>
 
-
 (defn empty-matrix-nm [n m]
-   (let [line (->> (repeat 0) (take n) vec)]
-         (->> (repeat line) (take m) vec)))
+  (let [line (->> (repeat 0) (take n) vec)]
+    (->> (repeat line) (take m) vec)))
 
+(defn rotate-matrix [m]
+  (let [transpose (fn [v] (mapv (fn [ind] (mapv #(get % ind)
+                                                (filter #(contains? % ind) v)))
+                                (->> (map count v) (apply max) range)))
+        transposed (transpose m)]
+    (vec (map (fn [v] (-> v reverse vec)) transposed))))
 
-(defn game-shapes []
+(defn clear-matrix [m]
+  (let [pure-m (remove #(every? #{1} %) m)
+        zero-row (take (-> m first count) (repeat 0))
+        zero-m (take (- (count m) (count pure-m)) (repeat zero-row))]
+    (mapv vec (concat zero-m pure-m))))
+
+(defn merge-matrices [dst src origin]
+  (loop [y (-> origin last dec) src src dst dst]
+    (if (empty? src)
+      dst
+      (recur
+       (inc y)
+       (rest src)
+       (update dst
+               y
+               (fn [v]
+                 (let [f (first src)
+                       pre (take (dec (first origin)) (repeat 0))
+                       post (take (- (count v) (+ (count pre) (count f))) (repeat 0))
+                       f2 (vec (flatten [pre f post]))]
+                   (mapv (fn [v f] (if (= 1 f) f v)) v f2))))))))
+
+(def tetrominoes
   [[[1 1 1 1]]
    [[1 1] [1 1]]
    [[1 1] [1 0] [1 0]]
@@ -61,59 +90,30 @@
 
 (defn create-stone
   ([]
-  {:crd [1 1]
-   :shape (get (game-shapes)
-               (-> (game-shapes) count rand-int))})
+   {:crd [1 1]
+    :shape (get tetrominoes
+                (-> tetrominoes count rand-int))})
   ([n]
    {:crd [1 1]
-    :shape (get (game-shapes) n (get (game-shapes) 0))}))
-
-
-(defn rotate-matrix [m]
-  (let [transpose (fn [v] (mapv (fn [ind] (mapv #(get % ind)
-                                                (filter #(contains? % ind) v)))
-                                (->> (map count v) (apply max) range)))
-        transposed (transpose m)]
-    (vec (map (fn [v] (-> v reverse vec)) transposed))))
-
-
-
-
-(defn clear-whole-lines-in-rock [db]
-  (let [rock (:rock db)
-        cleared (filter #(not-every? #{1} %) rock)
-        cleared-count (- (count rock) (count cleared))
-        max-x (-> db :frame first)
-        line (vec (take max-x (repeat 0)))
-        addon (vec (take cleared-count (repeat line)))]
-    (vec (concat addon cleared))))
-
+    :shape (get tetrominoes n (get tetrominoes 0))}))
 
 (defn get-coordinates [rock]
-  (let [crd (:crd rock)
-        x (first crd)
-        y (last crd)
+  (let [x (-> rock :crd first)
+        y (-> rock :crd last)
         shape (:shape rock)]
     (loop [r []
            rows shape]
       (if (nil? rows)
         r
-        (let
-         [coordinates (map
-                       (fn [flag b]
-                         (when (= flag 1) [(+ x b)
-                                           (+ y (- (count shape)
-                                                   (count rows)))]))
-                       (first rows)
-                       (range (count (first rows))))]
+        (let [coordinates (map
+                           #(when (= %1 1) [(+ x %2) (+ y (- (count shape)
+                                                             (count rows)))])
+                           (first rows)
+                           (range (count (first rows))))]
           (recur (apply conj r (remove nil? coordinates))
                  (next rows)))))))
 
-
-
-
-
-
+;; todo refactor
 (defn move-shape-to-in-field [direction shape field]
   (let [left (fn [crd] (assoc crd 0 (-> crd first dec)))
         right (fn [crd] (assoc crd 0 (-> crd first inc)))
@@ -136,34 +136,11 @@
               can-move? (if (or (nil? content-crd) (= 1 content-crd)) false true)]
           (recur can-move? (next crds)))))))
 
-(defn inject-shape [field shape origin]
-  (let [source field crd-x (first origin) crd-y (last origin)]
-    (loop [usm shape
-           src source
-           y (dec crd-y)
-           x (dec crd-x)]
-      (if (empty? usm)
-        src
-        (recur (rest usm)
-               (update src
-                       y
-                       (fn [v]
-                         (let [f (first usm)
-                               pre (take x (repeat 0))
-                               post (take (- (count v) (+ (count pre) (count f)))
-                                          (repeat 0))
-                               f2 (vec (flatten [pre f post]))]
-                           (mapv (fn [v f] (if (= 1 f) f v)) v f2))))
-
-               (inc y)
-               x)))))
-
-
-
 ;;<
 ;; Events
 ;;>
 
+;; todo refactor
 (def fix-move
   (rf/enrich
    (fn [db [_ _]]
@@ -172,20 +149,16 @@
            new-crd (move-shape-to-in-field :down stone rock)]
 
        (if (nil? new-crd)
-         (let [r0 (inject-shape rock (:shape stone) (:crd stone))
+         (let [r0 (merge-matrices rock (:shape stone) (:crd stone))
                db0 (assoc db :rock r0)
 
-               r1 (clear-whole-lines-in-rock db0)
+               r1 (clear-matrix (:rock db0))
                db1 (assoc db :rock r1)
 
                new-stone (create-stone)
                db2 (update db1 :stones (fn [s] (conj  (-> s rest vec) new-stone)))]
-
            db2)
          db)))))
-
-
-
 
 (rf/reg-event-db
  :move-stone
@@ -200,7 +173,6 @@
      (print new-crd)
      (if (nil? new-crd) db (assoc-in db [:stones 0 :crd] new-crd)))))
 
-
 (rf/reg-event-db
  :rotate-stone
  (fn [db [_ _]]
@@ -210,10 +182,6 @@
      (if (nil? new-crd)
        db
        (update-in db [:stones 0 :shape] (fn [s] (rotate-matrix s)))))))
-
-
-
-
 
 ;;<
 ;; Game stages
@@ -240,20 +208,15 @@
     :fx       [[:dispatch [:init-rock]]
                [:dispatch [:init-stones]]]}))
 
-
 (defn key-rules-move-tetris []
   (rf/dispatch
    [::rp/set-keydown-rules
-    {:event-keys [
-
-                  [[:rotate-stone] [{:keyCode 87}]]
+    {:event-keys [[[:rotate-stone] [{:keyCode 87}]]
 
                   ;[[:move-stone :rotate] [{:keyCode 87}]]
                   [[:move-stone :down] [{:keyCode 83}]]
                   [[:move-stone :left] [{:keyCode 65}]]
-                  [[:move-stone :right] [{:keyCode 68}]]
-
-                  ]
+                  [[:move-stone :right] [{:keyCode 68}]]]
 
      :clear-keys
      [[{:keyCode 27} ;; escape
@@ -285,7 +248,7 @@
    [(rf/subscribe [:stones])])
  (fn [[stones]]
    (let [stone (second stones)]
-     (inject-shape (empty-matrix-nm 4 4) (:shape stone) (:crd stone)))))
+     (merge-matrices (empty-matrix-nm 4 4) (:shape stone) (:crd stone)))))
 
 (rf/reg-sub
  :game-field
@@ -294,10 +257,8 @@
     (rf/subscribe [:stone])])
 
  (fn [[rock stone]]
-   (let [stone-on-field (inject-shape rock (:shape stone) (:crd stone))]
+   (let [stone-on-field (merge-matrices rock (:shape stone) (:crd stone))]
      stone-on-field)))
-
-
 
 ;;<
 ;; View
@@ -321,7 +282,7 @@
          [:td {:key (rand-int 100000)}
           (if (= 1 cell) "+" cell)])])]])
 
-(defn tetis-app []
+(defn tetris-app []
   [:div {:style {:color :black}}
    [:h1 "Tetris game"]
    [:ol
@@ -333,9 +294,6 @@
 
     [:li "Next" [next-stone]]
     [:li "Field" [game-field]]]])
-
-
-
 
 ;;<
 ;; Run
