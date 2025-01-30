@@ -69,12 +69,14 @@
     :shape (get (game-shapes) n (get (game-shapes) 0))}))
 
 
-(defn rotate-shape [m]
+(defn rotate-matrix [m]
   (let [transpose (fn [v] (mapv (fn [ind] (mapv #(get % ind)
                                                 (filter #(contains? % ind) v)))
                                 (->> (map count v) (apply max) range)))
         transposed (transpose m)]
     (vec (map (fn [v] (-> v reverse vec)) transposed))))
+
+
 
 
 (defn clear-whole-lines-in-rock [db]
@@ -120,7 +122,7 @@
         crd-mover (case direction :left left :right right :down down :rotate rotate)
 
         shape (case direction
-                :rotate (update shape :shape (fn [s] (rotate-shape s)))
+                :rotate (update shape :shape (fn [s] (rotate-matrix s)))
                 shape)
         coordinates (get-coordinates shape)
         moved-coordinates (mapv crd-mover coordinates)]
@@ -162,30 +164,32 @@
 ;; Events
 ;;>
 
-;; (def fix-move
-;;   (rf/enrich
-;;    (fn [db [_ _]]
-;;      (let [rock (:rock db)
-;;            stone (get-in db [:stones 0])
-;;            new-crd (move-shape-to-in-field :down stone rock)]
+(def fix-move
+  (rf/enrich
+   (fn [db [_ _]]
+     (let [rock (:rock db)
+           stone (get-in db [:stones 0])
+           new-crd (move-shape-to-in-field :down stone rock)]
 
-;;        (if (nil? new-crd)
-;;          (let [r0 (inject-shape rock (:shape stone) (:crd stone))
-;;                db0 (assoc db :rock r0)
+       (if (nil? new-crd)
+         (let [r0 (inject-shape rock (:shape stone) (:crd stone))
+               db0 (assoc db :rock r0)
 
-;;                r1 (clear-whole-lines-in-rock db0)
-;;                db1 (assoc db :rock r1)
+               r1 (clear-whole-lines-in-rock db0)
+               db1 (assoc db :rock r1)
 
-;;                new-stone (create-stone)
-;;                db2 (update db1 :stones (fn [s] (conj  (-> s rest vec) new-stone)))]
+               new-stone (create-stone)
+               db2 (update db1 :stones (fn [s] (conj  (-> s rest vec) new-stone)))]
 
-;;            db2)
-;;          db))))
+           db2)
+         db)))))
+
+
 
 
 (rf/reg-event-db
  :move-stone
-; [fix-move]
+ [fix-move]
  (fn [db [_ dir]]
    (let [rock (:rock db)
          stone (get-in db [:stones 0])
@@ -205,7 +209,7 @@
          new-crd (move-shape-to-in-field :rotate stone rock)]
      (if (nil? new-crd)
        db
-       (update-in db [:stones 0 :shape] (fn [s] (rotate-shape s)))))))
+       (update-in db [:stones 0 :shape] (fn [s] (rotate-matrix s)))))))
 
 
 
