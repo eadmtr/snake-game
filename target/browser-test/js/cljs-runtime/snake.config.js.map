@@ -1,0 +1,1 @@
+{"version":3,"sources":["snake/config.cljs"],"mappings":";AAEA,AAAKA,4BACMC","names":["snake.config/debug?","js/goog.DEBUG"],"sourcesContent":["(ns snake.config)\n\n(def debug?\n  ^boolean goog.DEBUG)\n"]}

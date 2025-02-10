@@ -1,0 +1,4 @@
+goog.provide('snake.db');
+snake.db.default_db = new cljs.core.PersistentArrayMap(null, 8, [new cljs.core.Keyword(null,"frame","frame",-1711082588),new cljs.core.PersistentArrayMap(null, 2, [new cljs.core.Keyword(null,"x","x",2099068185),(9),new cljs.core.Keyword(null,"y","y",-1757859776),(9)], null),new cljs.core.Keyword(null,"closed-field","closed-field",-1429625096),false,new cljs.core.Keyword(null,"move","move",-2110884309),(0),new cljs.core.Keyword(null,"is-lose","is-lose",-656697161),false,new cljs.core.Keyword(null,"points","points",-1486596883),cljs.core.PersistentVector.EMPTY,new cljs.core.Keyword(null,"foods","foods",1627982980),cljs.core.PersistentVector.EMPTY,new cljs.core.Keyword(null,"grow-queue","grow-queue",-877752680),cljs.core.PersistentVector.EMPTY,new cljs.core.Keyword(null,"turns","turns",-1118736892),cljs.core.PersistentVector.EMPTY], null);
+
+//# sourceMappingURL=snake.db.js.map
