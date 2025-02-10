@@ -1,4 +1,7 @@
-# snake
+# Snake & Tetris games
+
+## Taste Re-frame client state framework. 
+Experimetns with main mechanics of Re-frame.
 
 A [re-frame](https://github.com/day8/re-frame) application designed to ... well, that part is up to
 you.
