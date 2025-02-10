@@ -480,8 +480,9 @@
    :children [;; [home-title]
              ;; [link-to-about-page]
 
-              [tetris/tetris-app]
-              ;[snake-app]
+              ;; temp switching
+              ;;[tetris/tetris-app]
+              [snake-app]
 
               ]])
 
